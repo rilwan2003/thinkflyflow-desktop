@@ -8,7 +8,7 @@
  * search result) cannot reach the filesystem or the API key.
  */
 import { contextBridge, ipcRenderer } from 'electron';
-import type { SignInRequest, StatusSnapshot } from './ipc';
+import type { StatusSnapshot } from './ipc';
 
 /**
  * Channel names are duplicated here rather than imported.
@@ -21,8 +21,8 @@ import type { SignInRequest, StatusSnapshot } from './ipc';
  */
 const CH = {
   signIn: 'tff:sign-in',
+  cancelSignIn: 'tff:cancel-sign-in',
   signOut: 'tff:sign-out',
-  listWorkspaces: 'tff:list-workspaces',
   listProjects: 'tff:list-projects',
   getStatus: 'tff:get-status',
   statusChanged: 'tff:status-changed',
@@ -42,10 +42,9 @@ const CH = {
 } as const;
 
 contextBridge.exposeInMainWorld('tff', {
-  signIn: (req: SignInRequest) => ipcRenderer.invoke(CH.signIn, req),
+  signIn: () => ipcRenderer.invoke(CH.signIn),
+  cancelSignIn: () => ipcRenderer.invoke(CH.cancelSignIn),
   signOut: () => ipcRenderer.invoke(CH.signOut),
-  listWorkspaces: (baseUrl: string, email: string, password: string) =>
-    ipcRenderer.invoke(CH.listWorkspaces, baseUrl, email, password),
   listProjects: (workspaceId: string) => ipcRenderer.invoke(CH.listProjects, workspaceId),
 
   getStatus: () => ipcRenderer.invoke(CH.getStatus),

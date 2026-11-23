@@ -54,6 +54,10 @@ async function run(): Promise<void> {
     hasRequire: typeof window.require !== 'undefined',
     hasProcess: typeof window.process !== 'undefined',
     hasCsp: !!document.querySelector('meta[http-equiv="Content-Security-Policy"]'),
+    passwordFields: document.querySelectorAll('input[type=password]').length,
+    inputs: document.querySelectorAll('input').length,
+    logo: !!document.querySelector('img'),
+    logoLoaded: (() => { const i = document.querySelector('img'); return !!i && i.complete && i.naturalWidth > 0; })(),
   }))()`);
 
   check('preload bridge is exposed', probe.hasBridge);
@@ -69,7 +73,13 @@ async function run(): Promise<void> {
   check('no bridge failure screen', !/bridge is unavailable/.test(settledText), settledText.slice(0, 120));
   check('no console errors', consoleErrors.length === 0, JSON.stringify(consoleErrors));
 
-  const total = 8;
+  // The sign-in screen must ask for a browser hand-off, not a password. These
+  // three checks are the regression guard for the old credential form.
+  check('no password field on sign-in', probe.passwordFields === 0, String(probe.passwordFields));
+  check('no server/credential inputs', probe.inputs === 0, `${probe.inputs} inputs`);
+  check('ThinkFlyFlow logo renders', probe.logo && probe.logoLoaded, `present=${probe.logo} loaded=${probe.logoLoaded}`);
+
+  const total = 11;
   console.log(`RESULT: ${total - failures.length}/${total} passed`);
   app.exit(failures.length === 0 ? 0 : 1);
 }

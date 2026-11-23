@@ -1,20 +1,22 @@
 import { useEffect, useState } from 'react';
-import { DEFAULT_BASE_URL, bridge, secureStorageAvailable } from './bridge';
-import type { StatusSnapshot, WorkspaceOption } from '../electron/ipc';
+import { bridge, secureStorageAvailable } from './bridge';
+import type { StatusSnapshot } from '../electron/ipc';
+import logoUrl from './assets/logo.png';
 
 /**
  * Sign-in.
  *
- * Two steps on purpose: the workspace must be chosen before a key can be
- * issued, because keys are workspace-scoped. Signing in without a workspace
- * would either need a global key (too broad) or guess (wrong).
+ * There is no form here on purpose. The app opens the ThinkFlyFlow sign-in page
+ * in the real browser, which already handles 2FA, password resets and single
+ * sign-on, and hands back a single-use code. The user therefore types their
+ * password on the product's own login page, never into a dialog that only claims
+ * to be ThinkFlyFlow.
+ *
+ * The old version asked for a server address, an email and a password here. The
+ * server field was a developer setting leaking into the UI, and the form could
+ * not support 2FA at all.
  */
 export function SignIn({ onSignedIn }: { onSignedIn: (s: StatusSnapshot) => void }) {
-  const [baseUrl, setBaseUrl] = useState(DEFAULT_BASE_URL);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [workspaces, setWorkspaces] = useState<WorkspaceOption[] | null>(null);
-  const [workspaceId, setWorkspaceId] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [canStore, setCanStore] = useState(true);
@@ -23,42 +25,15 @@ export function SignIn({ onSignedIn }: { onSignedIn: (s: StatusSnapshot) => void
     void secureStorageAvailable().then(setCanStore);
   }, []);
 
-  async function loadWorkspaces(e: React.FormEvent) {
-    e.preventDefault();
+  async function start() {
     setError(null);
     setBusy(true);
     try {
-      const list = await bridge().listWorkspaces(baseUrl, email.trim(), password);
-      if (list.length === 0) {
-        setError('No workspaces found on that account.');
-        return;
-      }
-      setWorkspaces(list);
-      setWorkspaceId(String(list[0].id));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function finish(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setBusy(true);
-    try {
-      const res = await bridge().signIn({
-        baseUrl,
-        email: email.trim(),
-        password,
-        workspaceId,
-      });
+      const res = await bridge().signIn();
       if (!res.ok) {
         setError(res.error ?? 'Sign in failed.');
         return;
       }
-      // Clear the password from component state as soon as it is no longer needed.
-      setPassword('');
       onSignedIn(await bridge().getStatus());
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -67,91 +42,53 @@ export function SignIn({ onSignedIn }: { onSignedIn: (s: StatusSnapshot) => void
     }
   }
 
+  async function cancel() {
+    await bridge().cancelSignIn();
+    setBusy(false);
+    setError(null);
+  }
+
   return (
     <div className="centered">
-      <form className="card" onSubmit={workspaces ? finish : loadWorkspaces}>
-        <h1>ThinkFlyFlow</h1>
-        <p className="muted">
-          Sign in to sync the files on this computer with your workspace.
-        </p>
+      <div className="card">
+        <div className="brand">
+          <img src={logoUrl} alt="" />
+          <div className="brand-text">
+            <strong>ThinkFlyFlow</strong>
+            <span>Desktop</span>
+          </div>
+        </div>
 
-        {!workspaces ? (
-          <>
-            <label>
-              Server
-              <input
-                type="url"
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-                required
-                spellCheck={false}
-              />
-            </label>
-            <label>
-              Email
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="username"
-                autoFocus
-              />
-            </label>
-            <label>
-              Password
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-              />
-            </label>
-          </>
-        ) : (
-          <label>
-            Workspace
-            <select value={workspaceId} onChange={(e) => setWorkspaceId(e.target.value)}>
-              {workspaces.map((w) => (
-                <option key={w.id} value={String(w.id)}>
-                  {w.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
+        <h1>Sign in to sync your files</h1>
+        <p className="muted small">
+          Your browser opens so you can sign in to ThinkFlyFlow. Once you are signed in,
+          this app picks up where you left off and starts syncing the folders you choose.
+        </p>
 
         {error && <p className="error">{error}</p>}
 
         {!canStore && (
           <p className="warn">
-            This system has no secure credential storage, so your key cannot be saved.
-            You will need to sign in each time you launch the app.
+            This system has no secure credential storage, so your sign-in cannot be saved.
+            You will need to sign in each time the app starts.
           </p>
         )}
 
-        <button type="submit" disabled={busy}>
-          {busy ? 'Working...' : workspaces ? 'Start syncing' : 'Continue'}
+        <button onClick={() => void start()} disabled={busy}>
+          {busy ? 'Waiting for your browser…' : 'Sign in with ThinkFlyFlow'}
         </button>
 
-        {workspaces && (
-          <button
-            type="button"
-            className="link"
-            onClick={() => {
-              setWorkspaces(null);
-              setWorkspaceId('');
-            }}
-          >
-            Use a different account
+        {busy && (
+          <button type="button" className="link" onClick={() => void cancel()}>
+            Cancel
           </button>
         )}
 
         <p className="fine">
-          Your password is used once to issue a key for this workspace and is never stored.
+          No password is entered here. The app receives a single-use code, never your
+          credentials.
         </p>
-      </form>
+      </div>
     </div>
   );
 }

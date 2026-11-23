@@ -1,31 +1,69 @@
 /*
- * Visual language follows the house reference (Refero "MindMarket"):
- * cream canvas, ink text, 50px radii on cards, one structural accent, flat
- * fills with no gradients and no shadows.
+ * Visual language: the ThinkFlyFlow app itself.
  *
- * The one deviation is deliberate: a desktop utility needs denser type than a
- * marketing page, so display sizes are pulled down while the palette, radii and
- * flatness are kept.
+ * Colours are the same OKLCH values used by the web app (app/globals.css), so the
+ * desktop app reads as part of the same product rather than a separate tool.
+ * Hue 293.755 throughout, light background, purple primary.
+ *
+ * Earlier versions used the MindMarket cream palette, which is Ademola's design
+ * reference for MARKETING pages, not for the product UI. Using it here put the
+ * desktop app in a different brand from the app it belongs to.
  */
 :root {
-  --cream: #f5f1e4;
-  --white: #ffffff;
-  --sandstone: #e0dbce;
-  --ink: #2c2e2a;
-  --stone: #80827f;
-  --hairline: #d5d5d4;
-  --grass: #8ed462;
-  --coral: #ff705d;
-  --sky: #2ba0ff;
-  --sunshine: #f5e211;
+  color-scheme: light;
 
-  --radius-card: 50px;
-  --radius-chip: 10px;
-  --radius-control: 999px;
+  --background: oklch(0.98 0.01 293.755);
+  --foreground: oklch(0.15 0.04 293.755);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.15 0.04 293.755);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.15 0.04 293.755);
+  --primary: oklch(0.56 0.22 293.755);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.95 0.03 293.755);
+  --secondary-foreground: oklch(0.15 0.04 293.755);
+  --muted: oklch(0.92 0.02 293.755);
+  --muted-foreground: oklch(0.55 0.05 293.755);
+  --accent: oklch(0.56 0.22 293.755);
+  --accent-foreground: oklch(1 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.94 0.01 293.755);
+  --input: oklch(0.95 0.02 293.755);
+  --ring: oklch(0.56 0.22 293.755);
+  --radius: 0.625rem;
 
-  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  color: var(--ink);
-  background: var(--cream);
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  color: var(--foreground);
+  background: var(--background);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --background: oklch(0.13 0.02 293.755);
+    --foreground: oklch(0.95 0.01 293.755);
+    --card: oklch(0.18 0.02 293.755);
+    --card-foreground: oklch(0.95 0.01 293.755);
+    --popover: oklch(0.18 0.02 293.755);
+    --popover-foreground: oklch(0.95 0.01 293.755);
+    --primary: oklch(0.7 0.18 293.755);
+    --primary-foreground: oklch(0.15 0.04 293.755);
+    --secondary: oklch(0.25 0.03 293.755);
+    --secondary-foreground: oklch(0.95 0.01 293.755);
+    --muted: oklch(0.25 0.02 293.755);
+    --muted-foreground: oklch(0.7 0.03 293.755);
+    --accent: oklch(0.7 0.18 293.755);
+    --accent-foreground: oklch(0.15 0.04 293.755);
+    --destructive: oklch(0.65 0.2 27.325);
+    --border: oklch(0.28 0.02 293.755);
+    --input: oklch(0.25 0.02 293.755);
+    --ring: oklch(0.7 0.18 293.755);
+  }
 }
 
 * {
@@ -34,27 +72,27 @@
 
 body {
   margin: 0;
-  background: var(--cream);
-  color: var(--ink);
-  font-size: 15px;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
 
 h1,
-h2 {
+h2,
+h3 {
   margin: 0 0 8px;
   letter-spacing: -0.02em;
+  font-weight: 600;
 }
 
 h1 {
-  font-size: 30px;
-  font-weight: 500;
+  font-size: 26px;
 }
 
 h2 {
-  font-size: 20px;
-  font-weight: 500;
+  font-size: 17px;
 }
 
 p {
@@ -71,23 +109,50 @@ p {
 }
 
 .card {
-  background: var(--white);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-card);
-  padding: 40px;
-  width: min(440px, 100%);
+  background: var(--card);
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 2);
+  padding: 36px 32px;
+  width: min(420px, 100%);
   display: flex;
   flex-direction: column;
   gap: 4px;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.brand img {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+
+.brand-text strong {
+  display: block;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+
+.brand-text span {
+  display: block;
+  font-size: 12px;
+  color: var(--muted-foreground);
 }
 
 .app {
-  padding: 28px;
-  max-width: 900px;
+  padding: 22px;
+  max-width: 880px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
 .topbar {
@@ -95,16 +160,30 @@ p {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  background: var(--white);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-control);
-  padding: 12px 20px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 1.6);
+  padding: 10px 16px;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.topbar-left img {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  flex-shrink: 0;
 }
 
 .topbar-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 /* ── controls ───────────────────────────────────────── */
@@ -113,42 +192,50 @@ label {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 13px;
-  color: var(--stone);
-  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  margin-bottom: 10px;
 }
 
 input,
 select {
   font: inherit;
-  color: var(--ink);
-  background: var(--cream);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-control);
-  padding: 11px 16px;
+  font-weight: 400;
+  color: var(--foreground);
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 9px 12px;
   width: 100%;
   outline: none;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 input:focus,
 select:focus {
-  border-color: var(--grass);
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 18%, transparent);
 }
 
 button {
   font: inherit;
   font-weight: 500;
   cursor: pointer;
-  background: var(--white);
-  color: var(--ink);
-  border: 1px solid var(--ink);
-  border-radius: var(--radius-control);
-  padding: 11px 22px;
-  transition: background 120ms ease;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  padding: 9px 18px;
+  transition:
+    background 120ms ease,
+    opacity 120ms ease;
 }
 
 button:hover:not(:disabled) {
-  background: var(--sandstone);
+  opacity: 0.9;
 }
 
 button:disabled {
@@ -156,22 +243,34 @@ button:disabled {
   cursor: default;
 }
 
+button.secondary {
+  background: transparent;
+  color: var(--foreground);
+  border-color: var(--border);
+}
+
+button.secondary:hover:not(:disabled) {
+  background: var(--secondary);
+}
+
 button.link {
   border: none;
   background: none;
-  color: var(--stone);
+  color: var(--muted-foreground);
   padding: 6px 4px;
   text-decoration: underline;
+  font-weight: 400;
 }
 
 button.link:hover {
   background: none;
-  color: var(--ink);
+  color: var(--foreground);
+  opacity: 1;
 }
 
 .row {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
   margin-bottom: 14px;
 }
@@ -183,62 +282,66 @@ button.link:hover {
 /* ── panels and stats ───────────────────────────────── */
 
 .panel {
-  background: var(--white);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-card);
-  padding: 28px 32px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 2);
+  padding: 22px 24px;
 }
 
 .stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  gap: 10px;
 }
 
 .stat {
-  background: var(--white);
-  border: 1px solid var(--hairline);
-  border-radius: 28px;
-  padding: 18px 20px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 1.4);
+  padding: 14px 16px;
   display: flex;
   flex-direction: column;
 }
 
 .stat-bad {
-  border-color: var(--coral);
+  border-color: var(--destructive);
 }
 
 .stat-value {
-  font-size: 28px;
-  font-weight: 500;
-  letter-spacing: -0.03em;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 .stat-label {
-  font-size: 12px;
-  color: var(--stone);
+  font-size: 11px;
+  color: var(--muted-foreground);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
 }
 
 .pill {
-  font-size: 12px;
-  padding: 4px 12px;
-  border-radius: var(--radius-chip);
-  background: var(--sandstone);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
 }
 
 .pill.syncing {
-  background: var(--grass);
+  background: var(--primary);
+  color: var(--primary-foreground);
 }
 
 .pill.error {
-  background: var(--coral);
-  color: var(--white);
+  background: var(--destructive);
+  color: var(--primary-foreground);
 }
 
 .pill.paused {
-  background: var(--sunshine);
+  background: var(--muted);
+  color: var(--foreground);
 }
 
 /* ── lists ──────────────────────────────────────────── */
@@ -250,7 +353,7 @@ button.link:hover {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .roots li,
@@ -259,9 +362,10 @@ button.link:hover {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  background: var(--cream);
-  border-radius: var(--radius-chip);
-  padding: 10px 14px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 9px 12px;
 }
 
 .path {
@@ -275,34 +379,35 @@ button.link:hover {
 /* ── text ───────────────────────────────────────────── */
 
 .muted {
-  color: var(--stone);
+  color: var(--muted-foreground);
 }
 
 .small {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .fine {
-  font-size: 12px;
-  color: var(--stone);
+  font-size: 11px;
+  color: var(--muted-foreground);
   margin-top: 12px;
 }
 
 .empty {
-  color: var(--stone);
+  color: var(--muted-foreground);
   font-size: 13px;
   margin: 0;
 }
 
 .error {
-  color: var(--coral);
+  color: var(--destructive);
   font-size: 13px;
 }
 
 .warn {
-  color: var(--ink);
-  background: var(--sunshine);
-  border-radius: var(--radius-chip);
+  color: var(--foreground);
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: 10px 12px;
   font-size: 12px;
 }
@@ -310,7 +415,6 @@ button.link:hover {
 /* ── search palette window ──────────────────────────── */
 
 body.is-search-window {
-  /* The window itself is frameless; keep the canvas tight to the edges. */
   overflow: hidden;
 }
 
@@ -318,43 +422,45 @@ body.is-search-window {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: var(--white);
-  border: 1px solid var(--hairline);
-  border-radius: 24px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 1.8);
   overflow: hidden;
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.18);
 }
 
 .palette-input {
   border: none;
   border-radius: 0;
-  background: var(--white);
-  font-size: 19px;
-  padding: 22px 26px;
-  border-bottom: 1px solid var(--hairline);
+  background: transparent;
+  font-size: 17px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--border);
 }
 
 .palette-input:focus {
-  border-color: var(--hairline);
+  border-color: var(--border);
+  box-shadow: none;
 }
 
 .palette-results {
   flex: 1;
   overflow-y: auto;
-  padding: 10px 12px;
+  padding: 8px;
 }
 
 .palette-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
-  border-radius: 14px;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius);
   cursor: pointer;
 }
 
 .palette-row.active {
-  background: var(--cream);
-  outline: 1px solid var(--grass);
+  background: var(--secondary);
 }
 
 .row-main {
@@ -365,15 +471,15 @@ body.is-search-window {
 }
 
 .row-name {
-  font-size: 14px;
+  font-size: 13px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .row-context {
-  font-size: 12px;
-  color: var(--stone);
+  font-size: 11px;
+  color: var(--muted-foreground);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -382,33 +488,35 @@ body.is-search-window {
 .badge {
   font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 3px 8px;
-  border-radius: var(--radius-chip);
-  background: var(--sandstone);
-  color: var(--ink);
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
   flex-shrink: 0;
+  font-weight: 500;
 }
 
 .badge.local {
-  background: var(--grass);
+  background: var(--primary);
+  color: var(--primary-foreground);
 }
 
 .badge.cloud {
-  background: var(--sandstone);
+  background: var(--secondary);
 }
 
 .badge.warn {
-  background: var(--coral);
-  color: var(--white);
+  background: var(--destructive);
+  color: var(--primary-foreground);
 }
 
 .palette-footer {
   display: flex;
-  gap: 16px;
-  padding: 10px 26px;
-  border-top: 1px solid var(--hairline);
+  gap: 14px;
+  padding: 8px 22px;
+  border-top: 1px solid var(--border);
   font-size: 11px;
-  color: var(--stone);
-  background: var(--cream);
+  color: var(--muted-foreground);
+  background: var(--card);
 }

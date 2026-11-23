@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { bridge } from './bridge';
 import type { ProjectOption, SearchHit, StatusSnapshot } from '../electron/ipc';
+import logoUrl from './assets/logo.png';
 
 export function Dashboard({ status }: { status: StatusSnapshot }) {
   const [projects, setProjects] = useState<ProjectOption[]>([]);
@@ -59,9 +60,12 @@ export function Dashboard({ status }: { status: StatusSnapshot }) {
   return (
     <div className="app">
       <header className="topbar">
-        <div>
-          <strong>ThinkFlyFlow</strong>
-          <span className="muted"> · {status.workspaceName ?? 'workspace'}</span>
+        <div className="topbar-left">
+          <img src={logoUrl} alt="" />
+          <div>
+            <strong>ThinkFlyFlow</strong>
+            <span className="muted small"> · {status.workspaceName ?? 'workspace'}</span>
+          </div>
         </div>
         <div className="topbar-actions">
           <span className={`pill ${status.status}`}>{label(status.status)}</span>

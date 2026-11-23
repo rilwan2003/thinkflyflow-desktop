@@ -12,12 +12,21 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { ApiClient, createApiKey, fetchWorkspacesForSignIn } from './apiClient';
 import {
-  clearCredential,
+  AccountStore,
+  cancelPendingSignIn,
+  completeSignIn,
+  findDeepLink,
+  getApiBase,
+  handleDeepLink,
   isSecureStorageAvailable,
-  loadCredential,
-  saveCredential,
-} from './credentials';
-import { IPC, type ProjectOption, type SearchHit, type SignInRequest, type SignInResult, type StatusSnapshot, type WorkspaceOption, type WatchedRoot } from './ipc';
+  openSignIn,
+  parseAuthDeepLink,
+  registerProtocol,
+  resolveAccountEnvironment,
+  sessionPath,
+  verifySession,
+} from './account';
+import { IPC, type ProjectOption, type SearchHit, type SignInResult, type StatusSnapshot, type WatchedRoot } from './ipc';
 import { SyncEngine, type SyncStatus } from './syncEngine';
 import { SyncIndex } from './syncIndex';
 import { hideSearchWindow, toggleSearchWindow } from './searchWindow';
@@ -30,6 +39,16 @@ import { initAutoUpdate } from './updater';
 const useDevServer = process.env.TFF_DEV_SERVER === '1' && !app.isPackaged;
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
+let accountStore: AccountStore | null = null;
+
+function store(): AccountStore {
+  if (!accountStore) accountStore = new AccountStore(sessionPath());
+  return accountStore;
+}
+
+function accountApiBase(): string {
+  return getApiBase();
+}
 
 let index: SyncIndex | null = null;
 let engine: SyncEngine | null = null;
@@ -43,7 +62,12 @@ let lastDetail: string | undefined;
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on('second-instance', () => {
+  // Windows and Linux hand a deep link to the ALREADY RUNNING instance through
+  // argv on this event, so the sign-in callback must be read here too, not only
+  // at launch.
+  app.on('second-instance', (_event, argv) => {
+    const link = findDeepLink(argv);
+    if (link) void handleDeepLink(link);
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.show();
@@ -202,37 +226,37 @@ function createWindow(): void {
 }
 
 function registerIpc(): void {
-  ipcMain.handle(IPC.listWorkspaces, async (_e, baseUrl: string, email: string, password: string): Promise<WorkspaceOption[]> => {
-    const { workspaces } = await fetchWorkspacesForSignIn(baseUrl, email, password);
-    return workspaces.map((w) => ({ id: String(w.id), name: w.name }));
-  });
-
-  ipcMain.handle(IPC.signIn, async (_e, req: SignInRequest): Promise<SignInResult> => {
+  // Sign-in happens in the browser and comes back over a deep link. There is no
+  // email/password pair and no server field: the deployment is pinned in code.
+  ipcMain.handle(IPC.signIn, async (): Promise<SignInResult> => {
     try {
-      const raw = await createApiKey(req.baseUrl, req.email, req.password, req.workspaceId);
-      const client = new ApiClient({ baseUrl: req.baseUrl, apiKey: raw });
-      const workspaces = await client.listWorkspaces();
-      const match = workspaces.find((w) => String(w.id) === req.workspaceId);
-      workspaceName = match?.name ?? null;
+      const outcome = await openSignIn();
+      workspaceName = outcome.workspaceName;
 
-      saveCredential({
-        apiKey: raw,
-        baseUrl: req.baseUrl,
-        workspaceId: req.workspaceId,
-        workspaceName: workspaceName ?? '',
+      store().save({
+        apiKey: outcome.apiKey,
+        profile: outcome.profile,
+        workspaceId: outcome.workspaceId,
+        workspaceName: outcome.workspaceName,
+        signedInAt: Date.now(),
       });
 
-      api = client;
+      api = new ApiClient({ baseUrl: accountApiBase(), apiKey: outcome.apiKey });
       await startEngine();
-      return { ok: true, workspaceName: workspaceName ?? undefined };
+      return { ok: true, workspaceName: outcome.workspaceName };
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) };
     }
   });
 
+  // Cancel a sign-in the user abandoned, so the UI is not left waiting.
+  ipcMain.handle(IPC.cancelSignIn, async () => {
+    cancelPendingSignIn();
+  });
+
   ipcMain.handle(IPC.signOut, async () => {
     await stopEngine();
-    clearCredential();
+    store().clear();
     api = null;
     workspaceName = null;
     lastProgress = null;
@@ -376,9 +400,27 @@ function isUnderWatchedRoot(p: string): boolean {
   }
 }
 
+// Pinned deployment + deep-link scheme must both be set up before the app is
+// ready: the protocol client registration only takes effect from launch.
+resolveAccountEnvironment();
+registerProtocol();
+
+// macOS delivers a deep link through this event; Windows and Linux pass it in
+// argv to a second instance, handled below.
+app.on('open-url', (event, url) => {
+  if (parseAuthDeepLink(url)) {
+    event.preventDefault();
+    void handleDeepLink(url);
+  }
+});
+
 app.whenReady().then(async () => {
   registerIpc();
   createWindow();
+
+  // A launch triggered by the sign-in deep link (cold start).
+  const launchLink = findDeepLink(process.argv);
+  if (launchLink) setTimeout(() => void handleDeepLink(launchLink), 800);
 
   // Global hotkey for the search palette. Ctrl/Cmd+Shift+F is unlikely to
   // collide with the file manager or browser find shortcuts.
@@ -400,15 +442,16 @@ app.whenReady().then(async () => {
     return;
   }
 
-  // Restore a previous session without asking for the password again.
-  const cred = loadCredential();
-  if (cred) {
+  // Restore a previous session. verifySession probes the key and clears it only
+  // when the server actually refuses it, so an offline launch does not sign the
+  // user out over a failed network call.
+  const restored = await verifySession(store());
+  if (restored) {
     try {
-      api = new ApiClient({ baseUrl: cred.baseUrl, apiKey: cred.apiKey });
-      workspaceName = cred.workspaceName || null;
+      api = new ApiClient({ baseUrl: getApiBase(), apiKey: restored.apiKey });
+      workspaceName = restored.workspaceName || null;
       await startEngine();
     } catch (err) {
-      // A revoked or expired key must not wedge startup.
       lastDetail = err instanceof Error ? err.message : String(err);
       api = null;
     }

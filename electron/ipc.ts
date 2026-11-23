@@ -42,13 +42,11 @@ export interface ProjectOption {
   name: string;
 }
 
-export interface SignInRequest {
-  baseUrl: string;
-  email: string;
-  password: string;
-  workspaceId: string;
-}
-
+/**
+ * Sign-in no longer carries credentials. The app opens the ThinkFlyFlow sign-in
+ * page in the browser and receives a single-use code back over a deep link, so
+ * there is no email, password or server address anywhere in this contract.
+ */
 export interface SignInResult {
   ok: boolean;
   error?: string;
@@ -84,7 +82,7 @@ export interface RecentActivity {
 export const IPC = {
   signIn: 'tff:sign-in',
   signOut: 'tff:sign-out',
-  listWorkspaces: 'tff:list-workspaces',
+  cancelSignIn: 'tff:cancel-sign-in',
   listProjects: 'tff:list-projects',
   getStatus: 'tff:get-status',
   statusChanged: 'tff:status-changed',
@@ -105,9 +103,9 @@ export const IPC = {
 
 /** Shape exposed on window.tff by the preload script. */
 export interface TffBridge {
-  signIn(req: SignInRequest): Promise<SignInResult>;
+  signIn(): Promise<SignInResult>;
+  cancelSignIn(): Promise<void>;
   signOut(): Promise<void>;
-  listWorkspaces(baseUrl: string, email: string, password: string): Promise<WorkspaceOption[]>;
   listProjects(workspaceId: string): Promise<ProjectOption[]>;
   getStatus(): Promise<StatusSnapshot>;
   onStatus(cb: (snapshot: StatusSnapshot) => void): () => void;
