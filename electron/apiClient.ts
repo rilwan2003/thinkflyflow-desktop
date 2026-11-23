@@ -140,6 +140,26 @@ export class ApiClient {
     return res.data ?? [];
   }
 
+  /**
+   * Create a project. Used once, to give a brand new workspace somewhere to sync
+   * into: the desktop app is a companion, so it cannot require the user to have
+   * visited the website first and made one by hand.
+   */
+  async createProject(workspaceId: string | number, name: string): Promise<ProjectSummary> {
+    const res = await this.request<{ success: boolean; data: ProjectSummary }>(
+      `/api/v2/workspaces/${workspaceId}/projects/`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // `workspace` is required IN THE BODY; the view reads it from the
+        // serializer rather than inferring it from the URL path.
+        body: JSON.stringify({ name, workspace: workspaceId }),
+      },
+    );
+    if (!res?.data) throw new Error('Project creation returned no data');
+    return res.data;
+  }
+
   async listProjects(workspaceId: string | number): Promise<ProjectSummary[]> {
     const res = await this.request<{ success: boolean; data?: ProjectSummary[] }>(
       `/api/v2/workspaces/${workspaceId}/projects/`,

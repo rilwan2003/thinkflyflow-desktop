@@ -45,7 +45,7 @@ contextBridge.exposeInMainWorld('tff', {
   signIn: () => ipcRenderer.invoke(CH.signIn),
   cancelSignIn: () => ipcRenderer.invoke(CH.cancelSignIn),
   signOut: () => ipcRenderer.invoke(CH.signOut),
-  listProjects: (workspaceId: string) => ipcRenderer.invoke(CH.listProjects, workspaceId),
+  listProjects: () => ipcRenderer.invoke(CH.listProjects),
 
   getStatus: () => ipcRenderer.invoke(CH.getStatus),
 

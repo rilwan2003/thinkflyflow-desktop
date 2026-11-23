@@ -14,6 +14,8 @@ export interface StatusSnapshot {
   detail?: string;
   signedIn: boolean;
   workspaceName: string | null;
+  /** Held by the main process; the renderer never supplies it. */
+  workspaceId: string | null;
   counts: {
     pending: number;
     synced: number;
@@ -106,7 +108,7 @@ export interface TffBridge {
   signIn(): Promise<SignInResult>;
   cancelSignIn(): Promise<void>;
   signOut(): Promise<void>;
-  listProjects(workspaceId: string): Promise<ProjectOption[]>;
+  listProjects(): Promise<ProjectOption[]>;
   getStatus(): Promise<StatusSnapshot>;
   onStatus(cb: (snapshot: StatusSnapshot) => void): () => void;
   addRoot(path: string, projectId: string): Promise<WatchedRoot[]>;

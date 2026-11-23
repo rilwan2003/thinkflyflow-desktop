@@ -13,13 +13,27 @@ export function Dashboard({ status }: { status: StatusSnapshot }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let live = true;
+    // The workspace id belongs to the session in the main process, so no
+    // argument is passed. A failure here is surfaced rather than swallowed:
+    // silently showing an empty list is what made "no projects" look like a
+    // normal empty state when it was actually a 404.
     void bridge()
-      .listProjects('')
+      .listProjects()
       .then((list) => {
+        if (!live) return;
         setProjects(list);
         if (list.length > 0) setProjectId(String(list[0].id));
+        else setError('No projects were found in this workspace.');
       })
-      .catch(() => setProjects([]));
+      .catch((err) => {
+        if (!live) return;
+        setProjects([]);
+        setError(err instanceof Error ? err.message : String(err));
+      });
+    return () => {
+      live = false;
+    };
   }, []);
 
   async function addFolder() {

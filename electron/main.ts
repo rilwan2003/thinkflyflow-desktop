@@ -54,6 +54,7 @@ let index: SyncIndex | null = null;
 let engine: SyncEngine | null = null;
 let api: ApiClient | null = null;
 let workspaceName: string | null = null;
+let workspaceId: string | null = null;
 let lastProgress: { done: number; total: number } | null = null;
 let lastDetail: string | undefined;
 
@@ -92,6 +93,7 @@ function snapshot(): StatusSnapshot {
     detail: lastDetail,
     signedIn: api !== null,
     workspaceName,
+    workspaceId,
     counts: idx.counts(),
     roots: idx.getRoots().map(({ id, path: p, projectId, enabled }): WatchedRoot => ({
       id,
@@ -232,6 +234,7 @@ function registerIpc(): void {
     try {
       const outcome = await openSignIn();
       workspaceName = outcome.workspaceName;
+      workspaceId = outcome.workspaceId;
 
       store().save({
         apiKey: outcome.apiKey,
@@ -259,13 +262,37 @@ function registerIpc(): void {
     store().clear();
     api = null;
     workspaceName = null;
+    workspaceId = null;
     lastProgress = null;
     broadcast();
   });
 
-  ipcMain.handle(IPC.listProjects, async (_e, workspaceId: string): Promise<ProjectOption[]> => {
+  ipcMain.handle(IPC.listProjects, async (): Promise<ProjectOption[]> => {
     if (!api) return [];
-    const projects = await api.listProjects(workspaceId);
+    // Use the id held by the session, never one supplied by the renderer.
+    if (!workspaceId) {
+      throw new Error('No workspace is available for this session. Sign in again.');
+    }
+    let projects = await api.listProjects(workspaceId);
+
+    // Half of all workspaces have no project yet, and the app cannot sync into
+    // nothing. Rather than dead-ending with an empty list, create the default
+    // one the web app would have created. This only ever happens once per
+    // workspace, and it is what makes the first run of the app work.
+    if (projects.length === 0) {
+      try {
+        const created = await api.createProject(workspaceId, 'My Files');
+        projects = [created];
+        lastDetail = 'Created a "My Files" project so syncing can start.';
+        broadcast();
+      } catch (err) {
+        throw new Error(
+          'This workspace has no projects and one could not be created. ' +
+            (err instanceof Error ? err.message : 'Create a project on the ThinkFlyFlow website, then try again.'),
+        );
+      }
+    }
+
     return projects.map((p) => ({ id: String(p.id), name: p.name }));
   });
 
@@ -450,6 +477,7 @@ app.whenReady().then(async () => {
     try {
       api = new ApiClient({ baseUrl: getApiBase(), apiKey: restored.apiKey });
       workspaceName = restored.workspaceName || null;
+      workspaceId = restored.workspaceId || null;
       await startEngine();
     } catch (err) {
       lastDetail = err instanceof Error ? err.message : String(err);

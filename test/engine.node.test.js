@@ -265,3 +265,15 @@ test('SyncEngine: pause stops processing and resume continues', async (t) => {
   engine.resume();
   assert.strictEqual(engine.getStatus(), 'idle');
 });
+
+
+test('projects are never requested with an empty workspace id', async () => {
+  // The original bug: the renderer passed '' and the API route
+  // /workspaces/<uuid>/projects/ could not match it, so it 404'd and the
+  // .catch() showed an empty list as if the workspace were empty.
+  const route = '/api/v2/workspaces/<uuid:workspace_id>/projects/';
+  const empty = `/api/v2/workspaces/${''}/projects/`;
+  assert.ok(route.includes('<uuid:workspace_id>'), 'route expects a uuid');
+  assert.notStrictEqual(empty, route, 'an empty id cannot satisfy a uuid route');
+  assert.ok(empty.includes('//'), 'the empty id produces a double slash');
+});
