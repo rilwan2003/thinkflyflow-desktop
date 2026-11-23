@@ -1,6 +1,6 @@
 {
   "name": "thinkflyflow-desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "ThinkFlyFlow Desktop: sync local folders with your workspace",
   "main": "dist-electron/electron/main.js",
   "author": "ThinkFlyFlow",
