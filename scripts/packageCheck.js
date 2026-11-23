@@ -39,6 +39,25 @@ check(
   Array.isArray(pkg.build?.extraResources) && pkg.build.extraResources.length > 0,
 );
 
+// 2b. Platform icon paths must resolve relative to buildResources.
+//     electron-builder joins buildResources with the icon value, so
+//     "assets/icon.png" becomes assets/assets/icon.png. Linux and Windows
+//     tolerated that silently; macOS failed the whole build with
+//     "not a file". Catch it here instead of in a release run.
+const buildResources = pkg.build?.directories?.buildResources;
+if (buildResources) {
+  for (const platform of ['mac', 'win', 'linux']) {
+    const icon = pkg.build?.[platform]?.icon;
+    if (!icon) continue;
+    const resolved = path.join(__dirname, '..', buildResources, icon);
+    check(
+      `${platform} icon resolves under buildResources`,
+      fs.existsSync(resolved),
+      `${icon} -> ${resolved}`,
+    );
+  }
+}
+
 // 3. Build outputs exist and are non-trivial.
 const dist = path.join(__dirname, '..', 'dist', 'index.html');
 check('renderer built', fs.existsSync(dist), dist);
@@ -73,6 +92,6 @@ if (fs.existsSync(bundleDir)) {
 check('no secrets in renderer bundle', leaked.length === 0, leaked.join(','));
 
 console.log('');
-const total = 13;
+const total = 16;
 console.log(`RESULT: ${total - failures.length}/${total} passed`);
 process.exit(failures.length === 0 ? 0 : 1);
