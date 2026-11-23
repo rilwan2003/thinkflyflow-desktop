@@ -42,8 +42,7 @@
     "appId": "com.thinkflyflow.desktop",
     "productName": "ThinkFlyFlow",
     "directories": {
-      "output": "release",
-      "buildResources": "assets"
+      "output": "release"
     },
     "files": [
       "dist/**/*",
@@ -53,17 +52,14 @@
     "extraResources": [
       {
         "from": "assets",
-        "to": "assets",
-        "filter": [
-          "**/*.png"
-        ]
+        "to": "assets"
       }
     ],
     "win": {
       "target": [
         "nsis"
       ],
-      "icon": "icon.png"
+      "icon": "assets/icon.png"
     },
     "nsis": {
       "oneClick": false,
@@ -76,14 +72,14 @@
         "dmg"
       ],
       "category": "public.app-category.productivity",
-      "icon": "icon.png"
+      "icon": "assets/icon.png"
     },
     "linux": {
       "target": [
         "AppImage"
       ],
       "category": "Office",
-      "icon": "icon.png"
+      "icon": "assets/icon.png"
     },
     "publish": [
       {
