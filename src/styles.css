@@ -1,0 +1,414 @@
+/*
+ * Visual language follows the house reference (Refero "MindMarket"):
+ * cream canvas, ink text, 50px radii on cards, one structural accent, flat
+ * fills with no gradients and no shadows.
+ *
+ * The one deviation is deliberate: a desktop utility needs denser type than a
+ * marketing page, so display sizes are pulled down while the palette, radii and
+ * flatness are kept.
+ */
+:root {
+  --cream: #f5f1e4;
+  --white: #ffffff;
+  --sandstone: #e0dbce;
+  --ink: #2c2e2a;
+  --stone: #80827f;
+  --hairline: #d5d5d4;
+  --grass: #8ed462;
+  --coral: #ff705d;
+  --sky: #2ba0ff;
+  --sunshine: #f5e211;
+
+  --radius-card: 50px;
+  --radius-chip: 10px;
+  --radius-control: 999px;
+
+  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: var(--ink);
+  background: var(--cream);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--cream);
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2 {
+  margin: 0 0 8px;
+  letter-spacing: -0.02em;
+}
+
+h1 {
+  font-size: 30px;
+  font-weight: 500;
+}
+
+h2 {
+  font-size: 20px;
+  font-weight: 500;
+}
+
+p {
+  margin: 0 0 12px;
+}
+
+/* ── layout ─────────────────────────────────────────── */
+
+.centered {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.card {
+  background: var(--white);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+  padding: 40px;
+  width: min(440px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.app {
+  padding: 28px;
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--white);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-control);
+  padding: 12px 20px;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ── controls ───────────────────────────────────────── */
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--stone);
+  margin-bottom: 8px;
+}
+
+input,
+select {
+  font: inherit;
+  color: var(--ink);
+  background: var(--cream);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-control);
+  padding: 11px 16px;
+  width: 100%;
+  outline: none;
+}
+
+input:focus,
+select:focus {
+  border-color: var(--grass);
+}
+
+button {
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  background: var(--white);
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  border-radius: var(--radius-control);
+  padding: 11px 22px;
+  transition: background 120ms ease;
+}
+
+button:hover:not(:disabled) {
+  background: var(--sandstone);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.link {
+  border: none;
+  background: none;
+  color: var(--stone);
+  padding: 6px 4px;
+  text-decoration: underline;
+}
+
+button.link:hover {
+  background: none;
+  color: var(--ink);
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.row select {
+  flex: 1;
+}
+
+/* ── panels and stats ───────────────────────────────── */
+
+.panel {
+  background: var(--white);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+  padding: 28px 32px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.stat {
+  background: var(--white);
+  border: 1px solid var(--hairline);
+  border-radius: 28px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-bad {
+  border-color: var(--coral);
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--stone);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.pill {
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: var(--radius-chip);
+  background: var(--sandstone);
+}
+
+.pill.syncing {
+  background: var(--grass);
+}
+
+.pill.error {
+  background: var(--coral);
+  color: var(--white);
+}
+
+.pill.paused {
+  background: var(--sunshine);
+}
+
+/* ── lists ──────────────────────────────────────────── */
+
+.roots,
+.hits {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.roots li,
+.hits li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--cream);
+  border-radius: var(--radius-chip);
+  padding: 10px 14px;
+}
+
+.path {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── text ───────────────────────────────────────────── */
+
+.muted {
+  color: var(--stone);
+}
+
+.small {
+  font-size: 13px;
+}
+
+.fine {
+  font-size: 12px;
+  color: var(--stone);
+  margin-top: 12px;
+}
+
+.empty {
+  color: var(--stone);
+  font-size: 13px;
+  margin: 0;
+}
+
+.error {
+  color: var(--coral);
+  font-size: 13px;
+}
+
+.warn {
+  color: var(--ink);
+  background: var(--sunshine);
+  border-radius: var(--radius-chip);
+  padding: 10px 12px;
+  font-size: 12px;
+}
+
+/* ── search palette window ──────────────────────────── */
+
+body.is-search-window {
+  /* The window itself is frameless; keep the canvas tight to the edges. */
+  overflow: hidden;
+}
+
+.palette {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--white);
+  border: 1px solid var(--hairline);
+  border-radius: 24px;
+  overflow: hidden;
+}
+
+.palette-input {
+  border: none;
+  border-radius: 0;
+  background: var(--white);
+  font-size: 19px;
+  padding: 22px 26px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.palette-input:focus {
+  border-color: var(--hairline);
+}
+
+.palette-results {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 12px;
+}
+
+.palette-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.palette-row.active {
+  background: var(--cream);
+  outline: 1px solid var(--grass);
+}
+
+.row-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.row-name {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-context {
+  font-size: 12px;
+  color: var(--stone);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  border-radius: var(--radius-chip);
+  background: var(--sandstone);
+  color: var(--ink);
+  flex-shrink: 0;
+}
+
+.badge.local {
+  background: var(--grass);
+}
+
+.badge.cloud {
+  background: var(--sandstone);
+}
+
+.badge.warn {
+  background: var(--coral);
+  color: var(--white);
+}
+
+.palette-footer {
+  display: flex;
+  gap: 16px;
+  padding: 10px 26px;
+  border-top: 1px solid var(--hairline);
+  font-size: 11px;
+  color: var(--stone);
+  background: var(--cream);
+}

@@ -1,0 +1,150 @@
+name: Release
+
+# Safe by default, following the same rule as the VoicerAI pipeline: building is
+# harmless, but nothing is published unless someone explicitly asks for it.
+#
+# Tags: vX.Y.Z is Stable. vX.Y.Z-beta.N is a prerelease that never becomes
+# "latest". Any other tag shape is refused, because electron-updater derives the
+# update channel from the version and an unexpected shape can strand clients.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish the built installers as a GitHub release'
+        type: boolean
+        default: false
+      allow_unsigned:
+        description: 'Explicitly accept unsigned installers (Windows will warn users)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      channel: ${{ steps.shape.outputs.channel }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require a valid version tag
+        id: shape
+        run: |
+          set -euo pipefail
+          TAG="${{ github.ref_name }}"
+          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "channel=stable" >> "$GITHUB_OUTPUT"
+            echo "Stable release: $TAG"
+          elif [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+$ ]]; then
+            echo "channel=beta" >> "$GITHUB_OUTPUT"
+            echo "Beta release: $TAG"
+          else
+            echo "::error::Tag $TAG is not vX.Y.Z or vX.Y.Z-beta.N"
+            exit 1
+          fi
+
+  build:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            args: --linux AppImage
+          - os: windows-latest
+            args: --win nsis
+          - os: macos-latest
+            args: --mac dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: Fail if installers would be unsigned and that was not accepted
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.allow_unsigned }}" != "true" ]; then
+            if [ -z "${CSC_LINK:-}" ] && [ -z "${WIN_CSC_LINK:-}" ]; then
+              echo "::warning::No signing certificate configured; installers will be unsigned."
+            fi
+          fi
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+
+      - name: Package
+        shell: bash
+        run: npx electron-builder ${{ matrix.args }} --publish never
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          # macOS notarisation. Absent by default, which leaves the DMG unsigned
+          # rather than silently producing something Gatekeeper will block.
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.os }}
+          path: |
+            release/*.AppImage
+            release/*.exe
+            release/*.dmg
+            release/*.yml
+            release/*.blockmap
+          if-no-files-found: warn
+
+  publish:
+    needs: [validate, build]
+    if: inputs.publish == true || startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect installers
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          find artifacts -type f \( -name '*.AppImage' -o -name '*.exe' -o -name '*.dmg' \
+            -o -name '*.yml' -o -name '*.blockmap' \) -exec cp {} release/ \;
+          ls -lh release/
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          # A beta never becomes "latest", matching the channel the updater reads.
+          prerelease: ${{ needs.validate.outputs.channel == 'beta' }}
+          make_latest: ${{ needs.validate.outputs.channel == 'stable' }}
+          files: release/*
+          fail_on_unmatched_files: true
+          body: |
+            ThinkFlyFlow Desktop ${{ github.ref_name }}
+
+            Installs over any previous version. Your synced folders and sign-in are kept.

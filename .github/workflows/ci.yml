@@ -1,0 +1,74 @@
+name: CI
+
+# Runs on every push and PR. Deliberately checks only what can be checked
+# without a display: typecheck, unit tests, build. The Electron smoke tests need
+# a virtual framebuffer and are run locally (npm run verify); they are wired in
+# here too because xvfb is available on the runner and the smoke test is cheap.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        # The electron postinstall downloads a ~110MB binary that CI does not
+        # need for typecheck/tests, so it is skipped and installed only for the
+        # smoke steps below.
+        run: npm ci --ignore-scripts
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Packaging checks
+        run: node scripts/packageCheck.js
+
+      - name: Install Electron for smoke tests
+        run: node node_modules/electron/install.js
+
+      - name: Smoke test (main process)
+        run: xvfb-run -a npx electron --no-sandbox dist-electron/electron/main.js
+        env:
+          TFF_SMOKE: '1'
+
+      - name: Smoke test (search palette)
+        run: xvfb-run -a npx electron --no-sandbox dist-electron/scripts/searchSmoke.js
+        env:
+          TFF_SMOKE: '1'
+
+      - name: Secret scan
+        # Cheap, and the consequence of a leaked key in a public repo is total.
+        # The workflow files themselves are excluded: this step necessarily
+        # contains the patterns it searches for, so without the exclusion it
+        # matches itself and fails every run.
+        run: |
+          set -e
+          if git grep -nEI 'sk_live_[A-Za-z0-9]{8}|ghp_[A-Za-z0-9]{30}|BEGIN [A-Z ]*PRIVATE KEY|FlyV1 fm2_' \
+               -- . ':!.github/workflows/*'; then
+            echo "::error::Potential secret committed"
+            exit 1
+          fi
+          echo "No secrets found."
