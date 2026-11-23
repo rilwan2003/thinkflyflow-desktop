@@ -76,32 +76,53 @@ jobs:
 
       - run: npm run build
 
-      - name: Fail if installers would be unsigned and that was not accepted
+      - name: Warn when installers would be unsigned
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${{ inputs.allow_unsigned }}" != "true" ]; then
-            if [ -z "${CSC_LINK:-}" ] && [ -z "${WIN_CSC_LINK:-}" ]; then
-              echo "::warning::No signing certificate configured; installers will be unsigned."
-            fi
+          have_any=0
+          [ -n "${CSC_LINK_IN:-}" ] && have_any=1
+          [ -n "${WIN_CSC_LINK_IN:-}" ] && have_any=1
+          if [ "$have_any" = "0" ]; then
+            echo "::warning::No signing certificate configured; installers will be unsigned."
+            echo "Windows SmartScreen and macOS Gatekeeper will warn users."
+          else
+            echo "At least one signing certificate is configured."
           fi
         env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_LINK_IN: ${{ secrets.CSC_LINK }}
+          WIN_CSC_LINK_IN: ${{ secrets.WIN_CSC_LINK }}
 
       - name: Package
         shell: bash
-        run: npx electron-builder ${{ matrix.args }} --publish never
+        # Signing secrets are exported ONLY when non-empty.
+        #
+        # This is the bug that broke the first three macOS releases.
+        # electron-builder treats CSC_LINK as a path (or base64 blob) and calls
+        # path.resolve(cwd, CSC_LINK). With CSC_LINK set to an EMPTY STRING it
+        # resolves to the project directory, then fails its isFile() check with
+        # the misleading message "<repo-root> not a file".
+        # Windows and Linux tolerated the empty value; macOS aborted outright.
+        # Setting a variable to "" is NOT the same as leaving it unset.
+        run: |
+          set -euo pipefail
+          [ -n "${CSC_LINK_IN:-}" ] && export CSC_LINK="$CSC_LINK_IN"
+          [ -n "${CSC_KEY_PASSWORD_IN:-}" ] && export CSC_KEY_PASSWORD="$CSC_KEY_PASSWORD_IN"
+          [ -n "${WIN_CSC_LINK_IN:-}" ] && export WIN_CSC_LINK="$WIN_CSC_LINK_IN"
+          [ -n "${WIN_CSC_KEY_PASSWORD_IN:-}" ] && export WIN_CSC_KEY_PASSWORD="$WIN_CSC_KEY_PASSWORD_IN"
+          [ -n "${APPLE_ID_IN:-}" ] && export APPLE_ID="$APPLE_ID_IN"
+          [ -n "${APPLE_APP_SPECIFIC_PASSWORD_IN:-}" ] && export APPLE_APP_SPECIFIC_PASSWORD="$APPLE_APP_SPECIFIC_PASSWORD_IN"
+          [ -n "${APPLE_TEAM_ID_IN:-}" ] && export APPLE_TEAM_ID="$APPLE_TEAM_ID_IN"
+          echo "signing env present: CSC_LINK=${CSC_LINK:+yes} WIN_CSC_LINK=${WIN_CSC_LINK:+yes} APPLE_ID=${APPLE_ID:+yes}"
+          npx electron-builder ${{ matrix.args }} --publish never
         env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
-          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
-          # macOS notarisation. Absent by default, which leaves the DMG unsigned
-          # rather than silently producing something Gatekeeper will block.
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_LINK_IN: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD_IN: ${{ secrets.CSC_KEY_PASSWORD }}
+          WIN_CSC_LINK_IN: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD_IN: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          APPLE_ID_IN: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD_IN: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID_IN: ${{ secrets.APPLE_TEAM_ID }}
 
       - name: Upload installers
         uses: actions/upload-artifact@v4
