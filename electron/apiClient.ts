@@ -65,6 +65,35 @@ export interface SearchResponse {
   files: SearchFileHit[];
 }
 
+/**
+ * Turn whatever the API returned into a sentence a user can act on.
+ *
+ * `String(err.error)` produced "[object Object]" whenever Django returned the
+ * standard nested REST error, which tells the user nothing. This unwraps the
+ * common shapes and falls back to the status code.
+ *
+ * `details` is deliberately not surfaced: DRF's auth detail includes
+ * "Given token not valid for any token type", which is true but unhelpful, and
+ * the honest instruction is to sign in again.
+ */
+function errorMessageFrom(body: unknown, status: number): string {
+  const fallback = `Request failed with status ${status}`;
+  if (!body || typeof body !== 'object') return fallback;
+  const envelope = body as { error?: unknown; detail?: unknown; message?: unknown };
+
+  const pick = (value: unknown): string | null => {
+    if (typeof value === 'string' && value.trim() && value !== '[object Object]') return value.trim();
+    if (value && typeof value === 'object') {
+      const inner = value as { message?: unknown; detail?: unknown };
+      if (typeof inner.message === 'string' && inner.message.trim()) return inner.message.trim();
+      if (typeof inner.detail === 'string' && inner.detail.trim()) return inner.detail.trim();
+    }
+    return null;
+  };
+
+  return pick(envelope.error) ?? pick(envelope.detail) ?? pick(envelope.message) ?? fallback;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -94,7 +123,17 @@ export class ApiClient {
   private readonly fetchImpl: typeof fetch;
 
   constructor(opts: ApiClientOptions) {
-    this.baseUrl = opts.baseUrl.replace(/\/+$/, '');
+    // Normalise to the API ROOT, not the versioned path.
+    //
+    // Every path in this class already begins /api/v2. Callers were passing
+    // ".../api/v2" as the base, so requests went to /api/v2/api/v2/... and
+    // 404'd. Stripping a trailing /api/v2 (and any /vN variant) here means the
+    // class cannot double-prefix no matter what callers pass:
+    //   https://api.laureljar.com/api/v2  -> https://api.laureljar.com
+    //   https://api.laureljar.com         -> https://api.laureljar.com
+    this.baseUrl = opts.baseUrl
+      .replace(/\/+$/, '')
+      .replace(/\/api\/v\d+$/, '');
     this.apiKey = opts.apiKey;
     this.fetchImpl = opts.fetchImpl ?? fetch;
   }
@@ -124,8 +163,7 @@ export class ApiClient {
     }
 
     if (!res.ok) {
-      const raw = body && typeof body === 'object' && 'error' in body ? (body as { error: unknown }).error : null;
-      const message = raw != null && raw !== '' ? String(raw) : `Request failed with status ${res.status}`;
+      const message = errorMessageFrom(body, res.status);
       throw new ApiError(message, res.status, body);
     }
     return body as T;
