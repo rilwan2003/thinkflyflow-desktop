@@ -1,10 +1,10 @@
 {
   "name": "thinkflyflow-desktop",
   "version": "0.1.0",
-  "description": "ThinkFlyFlow Desktop: keeps your local files and your ThinkFlyFlow workspace in sync.",
+  "description": "ThinkFlyFlow Desktop: sync local folders with your workspace",
   "main": "dist-electron/electron/main.js",
   "author": "ThinkFlyFlow",
-  "license": "UNLICENSED",
+  "license": "AGPL-3.0-only",
   "private": true,
   "scripts": {
     "dev": "vite",
@@ -92,5 +92,9 @@
         "repo": "thinkflyflow-desktop"
       }
     ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rilwan2003/thinkflyflow-desktop.git"
   }
 }

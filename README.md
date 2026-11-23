@@ -166,8 +166,30 @@ Two design decisions worth knowing before changing anything:
 - **`node:sqlite`, not `better-sqlite3`.** The native module does not compile
   against recent V8 and would need rebuilding for every Electron upgrade.
 
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+Team roles:
+
+- Committers and reviewers: [Members team](https://github.com/orgs/rilwan2003/people?query=role%3Aowner)
+- Approvers: [Owners](https://github.com/orgs/rilwan2003/people?query=role%3Aowner)
+
+## Privacy policy
+
+This program will not transfer any information to other networked systems unless
+specifically requested by the user or the person installing or operating it.
+
+The app contacts only the ThinkFlyFlow server the user signs in to, and only to
+sync the folders the user explicitly chooses. It has no analytics, no telemetry
+and no crash reporting. Updates are fetched from this project's own GitHub
+releases. Your API key is stored only in the operating system credential store
+(described under Privacy above).
+
 ## Licence
 
-Proprietary. All rights reserved. Not for redistribution or modification without
-permission. This differs from VoicerAI, which is AGPL-3.0 because it is a fork of
-an existing open-source project; this app is original work.
+GNU Affero General Public License v3.0 only (AGPL-3.0-only). See [LICENSE](LICENSE).
+
+This follows VoicerAI, which is also AGPL-3.0. The copyleft terms are deliberate:
+the app is free to use, study, modify and redistribute, and any modified version
+offered over a network must also publish its source.
