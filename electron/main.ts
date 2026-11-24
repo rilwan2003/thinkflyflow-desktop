@@ -436,33 +436,71 @@ function isAllowedExternalUrl(url: unknown): boolean {
 
 
 
+/**
+ * Resolve a path to its real location, tolerating a final component that does
+ * not exist yet.
+ *
+ * realpathSync throws for a missing file, and the guard must not refuse a
+ * legitimate in-root path merely because the file was deleted between the
+ * search result being rendered and the user clicking it. So when the full path
+ * cannot be resolved, resolve its parent and re-join the name. A traversal
+ * vanishes at this point either way, because the parent is resolved first.
+ */
+function realResolve(p: string): string {
+  const abs = path.resolve(p);
+  try {
+    return fs.realpathSync.native(abs);
+  } catch {
+    const parent = path.dirname(abs);
+    const name = path.basename(abs);
+    if (parent === abs) throw new Error('cannot resolve');
+    // Resolving the parent collapses any ../ that reached this level.
+    return path.join(fs.realpathSync.native(parent), name);
+  }
+}
+
 function isUnderWatchedRoot(p: string): boolean {
   if (typeof p !== 'string' || !p) return false;
+
+  // Windows and macOS filesystems are case-insensitive, and realpathSync
+  // returns the ON-DISK casing while the stored root may have been entered with
+  // different case. A case-sensitive compare would therefore refuse to open a
+  // perfectly legitimate file. Linux is case-sensitive, so folding is only
+  // applied where the platform does it.
+  const fold = (s: string): string => (process.platform === 'linux' ? s : s.toLowerCase());
+
   try {
     // A bare startsWith is a prefix match, not a containment check. It let two
     // things through that must never be opened or revealed:
-    //   /watched-evil/x        (sibling whose name shares the prefix)
+    //   /watched-evil/x             (sibling whose name shares the prefix)
     //   /watched/../../etc/passwd   (traversal out of the root)
-    // Resolve both sides first, then compare with a separator so only genuine
-    // descendants match. realpathSync also collapses symlinks, so a link inside
-    // the root cannot point the handler at something outside it.
-    const resolved = fs.realpathSync.native(path.resolve(p));
+    //   C:\Downloads-evil\x         the same on Windows
+    //   C:\Downloads\..\..\Windows\System32\config\SAM   which is far worse
+    // Resolve both sides, then compare with a trailing separator so only genuine
+    // descendants match. Resolving also folds symlinks and junctions, so a link
+    // inside the root cannot point the handler outside it.
+    const resolved = fold(realResolve(p));
+
     return ensureIndex()
       .getRoots()
       .filter((r) => r.enabled)
       .some((r) => {
         let root: string;
         try {
-          root = fs.realpathSync.native(path.resolve(r.path));
+          root = fold(realResolve(r.path));
         } catch {
-          root = path.resolve(r.path);
+          // The root itself no longer resolves (deleted, or an unmounted drive).
+          // Fall back to the lexical path so a valid descendant is not refused
+          // merely because the root is missing. The separator rule still applies.
+          root = fold(path.resolve(r.path));
         }
         if (resolved === root) return true;
-        const withSep = root.endsWith(path.sep) ? root : root + path.sep;
+        const sep = path.sep.toLowerCase();
+        const withSep = root.endsWith(sep) ? root : root + sep;
         return resolved.startsWith(withSep);
       });
   } catch {
-    // A path that cannot be resolved (missing, or a broken link) is not trusted.
+    // A path that cannot be resolved at all is not trusted.
     return false;
   }
 }
