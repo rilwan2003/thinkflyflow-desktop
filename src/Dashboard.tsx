@@ -107,7 +107,11 @@ export function Dashboard({ status }: { status: StatusSnapshot }) {
         </p>
 
         <div className="row">
-          <select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+          <select
+            aria-label="Project to sync folders into"
+            value={projectId}
+            onChange={(e) => setProjectId(e.target.value)}
+          >
             {projects.length === 0 && <option value="">Loading projects...</option>}
             {projects.map((p) => (
               <option key={p.id} value={String(p.id)}>
