@@ -577,6 +577,24 @@ if (process.env.TFF_QA_BRIDGE === '1' && !app.isPackaged) {
         return isAllowedExternalUrl(String(arg ?? ''));
       case 'shortcutRegistered':
         return globalShortcut.isRegistered('CommandOrControl+Shift+F');
+      case 'deliverDeepLink':
+        // Simulates the OS handing a sign-in link to a running instance.
+        await handleDeepLink(String(arg ?? ''));
+        return { ok: true };
+      case 'forceSignedInView': {
+        // Drives the renderer into its signed-in view without a real account, so
+        // the dashboard's own CSS and controls can be audited.
+        if (!mainWindow) return { ok: false };
+        mainWindow.webContents.send('tff:status-changed', {
+          status: 'idle',
+          signedIn: true,
+          workspaceName: 'QA Workspace',
+          workspaceId: 'qa-ws',
+          counts: { pending: 0, synced: 3, uploading: 0, failed: 0, skipped: 0 },
+          roots: [{ id: 'qa-root', path: '/tmp/qa-root', projectId: 'qa-proj', enabled: true }],
+        });
+        return { ok: true };
+      }
       case 'windowPrefs': {
         const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed());
         return w ? { ...(w.webContents as any).getLastWebPreferences?.() } : {};
