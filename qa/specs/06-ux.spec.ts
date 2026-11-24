@@ -362,9 +362,16 @@ test('U-06: a failed sign-in surfaces a readable error, not a raw exception', as
 });
 
 test('U-07: the signed-out screen states what the app needs from the user', async () => {
-  const body = (await env.window.textContent('body')) ?? '';
-  console.log('[U-07] signed-out copy:', body.trim().slice(0, 240).replace(/\s+/g, ' '));
+  // Launch a clean instance: earlier tests drive this one into the dashboard,
+  // and signed-out copy can only be judged on the signed-out screen.
+  const fresh = await launchApp();
+  try {
+    const body = (await fresh.window.textContent('body')) ?? '';
+    console.log('[U-07] signed-out copy:', body.trim().slice(0, 240).replace(/\s+/g, ' '));
 
-  // A person who has never seen this app should know it needs a sign-in.
-  expect(body.toLowerCase()).toMatch(/sign in|sign-in|continue/);
+    // A person who has never seen this app should know it needs a sign-in.
+    expect(body.toLowerCase()).toMatch(/sign in|sign-in|continue/);
+  } finally {
+    await fresh.cleanup();
+  }
 });
