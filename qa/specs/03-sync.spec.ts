@@ -224,24 +224,34 @@ test('Y-09: a file larger than the limit is recorded as skipped, not retried for
 });
 
 test('Y-10: an offline backend fails without losing the file, and recovers', async () => {
+  // A dedicated file, so retries consumed here cannot affect another test's
+  // attempt budget. The engine gives up after MAX_ATTEMPTS (5) with no backoff,
+  // so sharing a path across tests would let earlier failures exhaust the
+  // budget for this one.
+  const content = `written while the backend is down ${Date.now()}`;
+  const full = join(env.watchDir, `offline-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.txt`);
+
   env.backend.offline = true;
-  const content = 'written while the backend is down';
-  const full = join(env.watchDir, `offline-${Date.now()}.txt`);
   writeFileSync(full, content);
 
   await new Promise((r) => setTimeout(r, 4000));
   const during = await env.inMain<any>('syncFile', full);
-  console.log('[Y-10] state while offline:', during?.state);
+  console.log('[Y-10] state while offline:', during?.state, 'attempts:', during?.attempts);
   expect(during?.state, 'must not claim success while the backend is down').not.toBe('synced');
 
   env.backend.offline = false;
   // Touch the file so a fresh event re-queues it, as a real user would after
   // the network returns.
   writeFileSync(full, content + ' ');
-  await waitFor(async () => {
-    const s = await env.inMain<any>('syncFile', full);
-    return s?.state === 'synced';
-  }, 'recovers once the backend is reachable', 30000);
+
+  await waitFor(
+    async () => {
+      const s = await env.inMain<any>('syncFile', full);
+      return s?.state === 'synced';
+    },
+    'recovers once the backend is reachable',
+    30000,
+  );
   console.log('[Y-10] recovered after the backend returned');
 });
 
