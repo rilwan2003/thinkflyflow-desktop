@@ -257,7 +257,57 @@ export class SyncEngine {
   resume(): void {
     this.paused = false;
     this.setStatus('idle');
+    // Anything created while paused never reached a queue: onFsEvent() returns
+    // early in that state. Re-scan before draining, mirroring start(), or those
+    // files stay invisible until something touches them again.
+    try {
+      const roots = this.index.getRoots();
+      for (const root of roots) {
+        if (!root.enabled) continue;
+        for (const f of this.index.getUnsyncedFiles()) {
+          if (f.path.startsWith(root.path) && fs.existsSync(f.path)) this.enqueue(f.path);
+        }
+      }
+      // Files created during the pause are not in the index at all, so also
+      // sweep the roots for anything on disk the index has never seen.
+      void this.sweepRoots(roots);
+    } catch {
+      // Never block a resume on the sweep.
+    }
     void this.drain();
+  }
+
+  /**
+   * Queue every file under each enabled root that the index does not already
+   * have in a terminal state. Used on resume to recover work dropped while
+   * paused.
+   */
+  private async sweepRoots(roots: RootConfig[]): Promise<void> {
+    for (const root of roots) {
+      if (!root.enabled) continue;
+      const stack = [root.path];
+      while (stack.length) {
+        const dir = stack.pop()!;
+        let entries: fs.Dirent[];
+        try {
+          entries = await fsp.readdir(dir, { withFileTypes: true });
+        } catch {
+          continue;
+        }
+        for (const e of entries) {
+          const full = path.join(dir, e.name);
+          if (isExcluded(full)) continue;
+          if (e.isDirectory()) {
+            stack.push(full);
+            continue;
+          }
+          if (!e.isFile()) continue;
+          const existing = this.index.getFile(full);
+          if (existing && (existing.state === 'synced' || existing.state === 'skipped')) continue;
+          this.enqueue(full);
+        }
+      }
+    }
   }
 
   async stop(): Promise<void> {
