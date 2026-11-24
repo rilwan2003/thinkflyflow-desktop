@@ -51,6 +51,19 @@ export function resolveAccountEnvironment(): void {
   const requested = process.env.TFF_ACCOUNT_ENV?.trim().toLowerCase() === 'staging';
   const allowed = process.env.TFF_ACCOUNT_ENV_ALLOW === '1';
   const packaged = typeof app?.isPackaged === 'boolean' ? app.isPackaged : true;
+
+  // QA seam. A local fake backend has to be addressable, and the two shipped
+  // environments above are the only ones a real user can ever reach. This is
+  // gated on an explicit variable AND an unpackaged build, so a released
+  // binary still cannot be redirected anywhere: the packaged branch below
+  // always wins for packaged builds.
+  const override = process.env.TFF_TEST_API_BASE?.trim();
+  if (override && !packaged) {
+    apiBase = override.replace(/\/+$/, '');
+    webOrigin = process.env.TFF_TEST_WEB_ORIGIN?.trim() || webOrigin;
+    return;
+  }
+
   const origins = requested && allowed && !packaged ? STAGING_ORIGINS : PRODUCTION_ORIGINS;
   webOrigin = origins.web;
   apiBase = `${origins.api}/api/v2`;

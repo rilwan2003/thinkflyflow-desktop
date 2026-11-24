@@ -17,6 +17,7 @@ import {
   completeSignIn,
   findDeepLink,
   getApiBase,
+  getWebOrigin,
   handleDeepLink,
   isSecureStorageAvailable,
   openSignIn,
@@ -24,6 +25,8 @@ import {
   registerProtocol,
   resolveAccountEnvironment,
   sessionPath,
+  signInUrl,
+  exchangeCode,
   verifySession,
 } from './account';
 import { IPC, type ProjectOption, type SearchHit, type SignInResult, type StatusSnapshot, type WatchedRoot } from './ipc';
@@ -431,6 +434,41 @@ function isUnderWatchedRoot(p: string): boolean {
 // ready: the protocol client registration only takes effect from launch.
 resolveAccountEnvironment();
 registerProtocol();
+
+/**
+ * QA bridge. The Playwright harness evaluates code inside the main process but
+ * has no module loader there, so internal functions cannot be reached directly.
+ * This exposes a narrow, read-mostly view of them for tests.
+ *
+ * Gated on TFF_QA_BRIDGE=1 AND an unpackaged build: a released binary is not
+ * affected, and nothing here can reach the filesystem or the stored credential.
+ */
+if (process.env.TFF_QA_BRIDGE === '1' && !app.isPackaged) {
+  ipcMain.handle('tff-qa:evaluate', async (_e, op: string, arg?: unknown) => {
+    switch (op) {
+      case 'signInUrl':
+        return signInUrl();
+      case 'parseDeepLink':
+        return parseAuthDeepLink(String(arg ?? ''));
+      case 'apiBase':
+        return getApiBase();
+      case 'webOrigin':
+        return getWebOrigin();
+      case 'secureStorage':
+        return isSecureStorageAvailable();
+      case 'exchangeCode':
+        try {
+          return { ok: true, value: await exchangeCode(String(arg ?? '')) };
+        } catch (err) {
+          return { ok: false, error: err instanceof Error ? err.message : String(err) };
+        }
+      case 'status':
+        return snapshot();
+      default:
+        throw new Error(`unknown qa op: ${op}`);
+    }
+  });
+}
 
 // macOS delivers a deep link through this event; Windows and Linux pass it in
 // argv to a second instance, handled below.

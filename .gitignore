@@ -6,3 +6,6 @@ release/
 .DS_Store
 .DS_Store?
 Thumbs.db
+
+# QA artifacts
+qa/test-results/

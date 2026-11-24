@@ -19,13 +19,16 @@
     "smoke:search": "npm run build && TFF_SMOKE=1 xvfb-run -a electron --no-sandbox dist-electron/scripts/searchSmoke.js",
     "verify": "npm run test && npm run smoke && npm run smoke:search && node scripts/packageCheck.js",
     "package:check": "npm run build && node scripts/packageCheck.js",
-    "dev:app": "npm run build:electron && TFF_DEV_SERVER=1 electron dist-electron/electron/main.js"
+    "dev:app": "npm run build:electron && TFF_DEV_SERVER=1 electron dist-electron/electron/main.js",
+    "qa": "npm run build:electron && xvfb-run -a playwright test",
+    "qa:headed": "npm run build:electron && xvfb-run -a playwright test --headed"
   },
   "dependencies": {
     "chokidar": "^3.6.0",
     "electron-updater": "^6.3.9"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "@types/node": "^22.9.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

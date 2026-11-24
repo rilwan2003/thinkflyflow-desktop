@@ -84,4 +84,8 @@ contextBridge.exposeInMainWorld('tff', {
   openExternal: (url: string) => ipcRenderer.invoke(CH.openExternal, url),
 
   secureStorageAvailable: () => ipcRenderer.invoke('tff:secure-storage-available'),
+
+  // QA only. The harness drives the app through this; it exists only when the
+  // main process registered the handler (TFF_QA_BRIDGE=1, unpackaged).
+  qa: (op: string, arg?: unknown) => ipcRenderer.invoke('tff-qa:evaluate', op, arg),
 });
