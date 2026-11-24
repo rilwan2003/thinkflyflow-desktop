@@ -79,7 +79,16 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<TestEnv> {
   const app = await electron.launch({
     executablePath,
     // Root in a container: Chromium refuses to start with its sandbox on.
-    args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', repoRoot],
+    // --user-data-dir is what makes the "fresh profile" guarantee real: the
+    // sync index and account.json both live under app.getPath('userData'), so
+    // without this every run would inherit the previous run's state.
+    args: [
+      '--no-sandbox',
+      '--disable-gpu',
+      '--disable-dev-shm-usage',
+      `--user-data-dir=${userData}`,
+      repoRoot,
+    ],
     env,
   });
 

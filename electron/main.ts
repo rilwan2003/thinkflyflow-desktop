@@ -464,6 +464,51 @@ if (process.env.TFF_QA_BRIDGE === '1' && !app.isPackaged) {
         }
       case 'status':
         return snapshot();
+
+      // --- sync engine -----------------------------------------------------
+      // Drives the real SyncEngine and SyncIndex against the fake backend, so
+      // tests exercise production code rather than a stand-in.
+      case 'syncStart': {
+        const idx = ensureIndex();
+        const base = (process.env.TFF_TEST_API_BASE ?? '').replace(/\/api\/v\d+$/, '');
+        const client = new ApiClient({
+          baseUrl: base || getApiBase(),
+          apiKey: 'qa-key',
+        });
+        api = client;
+        await startEngine();
+        return { ok: true };
+      }
+      case 'syncAddRoot': {
+        const p = String(arg ?? '');
+        const idx = ensureIndex();
+        const id = Buffer.from(p).toString('base64url').slice(0, 24);
+        idx.addRoot({ id, path: p, projectId: 'fake-proj-1', enabled: true });
+        if (engine) await engine.watchRoot({ id, path: p, projectId: 'fake-proj-1', enabled: true });
+        return { ok: true, id };
+      }
+      case 'syncRemoveRoot': {
+        if (engine) await engine.unwatchRoot(String(arg ?? ''));
+        ensureIndex().removeRoot(String(arg ?? ''));
+        return { ok: true };
+      }
+      case 'syncPause':
+        engine?.pause();
+        return { ok: true };
+      case 'syncResume':
+        engine?.resume();
+        return { ok: true };
+      case 'syncStop':
+        await stopEngine();
+        return { ok: true };
+      case 'syncCounts':
+        return ensureIndex().counts();
+      case 'syncFile': {
+        const f = ensureIndex().getFile(String(arg ?? ''));
+        return f ? { ...f } : null;
+      }
+      case 'syncStatus':
+        return engine?.getStatus() ?? 'idle';
       default:
         throw new Error(`unknown qa op: ${op}`);
     }
