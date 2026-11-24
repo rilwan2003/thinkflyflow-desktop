@@ -21,6 +21,11 @@ export function isSearchWindowOpen(): boolean {
   return searchWindow !== null && !searchWindow.isDestroyed();
 }
 
+/** Open AND on screen. `isSearchWindowOpen` is true for a hidden palette too. */
+export function isSearchWindowVisible(): boolean {
+  return isSearchWindowOpen() && searchWindow!.isVisible();
+}
+
 export function toggleSearchWindow(): void {
   if (isSearchWindowOpen() && searchWindow!.isVisible()) {
     hideSearchWindow();

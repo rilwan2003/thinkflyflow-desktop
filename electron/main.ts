@@ -32,7 +32,7 @@ import {
 import { IPC, type ProjectOption, type SearchHit, type SignInResult, type StatusSnapshot, type WatchedRoot } from './ipc';
 import { SyncEngine, type SyncStatus } from './syncEngine';
 import { SyncIndex } from './syncIndex';
-import { hideSearchWindow, toggleSearchWindow } from './searchWindow';
+import { hideSearchWindow, isSearchWindowVisible, isSearchWindowOpen, toggleSearchWindow } from './searchWindow';
 import { initAutoUpdate } from './updater';
 
 // Dev-server mode is opt-in, not the default for any unpackaged run.
@@ -417,15 +417,52 @@ function registerIpc(): void {
   });
 
   ipcMain.handle(IPC.openExternal, async (_e, url: string) => {
-    if (typeof url === 'string' && url.startsWith('https://')) await shell.openExternal(url);
+    if (isAllowedExternalUrl(url)) await shell.openExternal(url);
   });
 }
+
+/**
+ * Only https:// may be handed to the OS. Blocks file://, javascript:, ms-msdt:
+ * and every other scheme that can escalate into local code execution.
+ */
+function isAllowedExternalUrl(url: unknown): boolean {
+  if (typeof url !== 'string' || !url) return false;
+  try {
+    return new URL(url).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+
 
 function isUnderWatchedRoot(p: string): boolean {
   if (typeof p !== 'string' || !p) return false;
   try {
-    return ensureIndex().getRoots().some((r) => r.enabled && p.startsWith(r.path));
+    // A bare startsWith is a prefix match, not a containment check. It let two
+    // things through that must never be opened or revealed:
+    //   /watched-evil/x        (sibling whose name shares the prefix)
+    //   /watched/../../etc/passwd   (traversal out of the root)
+    // Resolve both sides first, then compare with a separator so only genuine
+    // descendants match. realpathSync also collapses symlinks, so a link inside
+    // the root cannot point the handler at something outside it.
+    const resolved = fs.realpathSync.native(path.resolve(p));
+    return ensureIndex()
+      .getRoots()
+      .filter((r) => r.enabled)
+      .some((r) => {
+        let root: string;
+        try {
+          root = fs.realpathSync.native(path.resolve(r.path));
+        } catch {
+          root = path.resolve(r.path);
+        }
+        if (resolved === root) return true;
+        const withSep = root.endsWith(path.sep) ? root : root + path.sep;
+        return resolved.startsWith(withSep);
+      });
   } catch {
+    // A path that cannot be resolved (missing, or a broken link) is not trusted.
     return false;
   }
 }
@@ -509,6 +546,49 @@ if (process.env.TFF_QA_BRIDGE === '1' && !app.isPackaged) {
       }
       case 'syncStatus':
         return engine?.getStatus() ?? 'idle';
+
+      // --- search ----------------------------------------------------------
+      case 'searchLocal':
+        return ensureIndex()
+          .allFiles()
+          .filter((f) => f.path.toLowerCase().includes(String(arg ?? '').toLowerCase()))
+          .slice(0, 20)
+          .map((f) => ({ localPath: f.path, size: f.size, state: f.state, exists: fs.existsSync(f.path) }));
+      case 'searchRemote': {
+        if (!api) return { skipped: 'not signed in to a backend' };
+        try {
+          return { ok: true, hits: await api.search(String(arg ?? '')) };
+        } catch (err) {
+          return { ok: false, error: err instanceof Error ? err.message : String(err) };
+        }
+      }
+      case 'searchWindowHide':
+        hideSearchWindow();
+        return { visible: isSearchWindowVisible() };
+      case 'searchWindowVisible':
+        return isSearchWindowVisible();
+
+      // --- IPC guards (Phase 5) --------------------------------------------
+      // These return whether the guard ALLOWED the operation, without actually
+      // launching anything, so the guard can be tested without opening files.
+      case 'guardUnderRoot':
+        return isUnderWatchedRoot(String(arg ?? ''));
+      case 'guardOpenExternal':
+        return isAllowedExternalUrl(String(arg ?? ''));
+      case 'shortcutRegistered':
+        return globalShortcut.isRegistered('CommandOrControl+Shift+F');
+      case 'windowPrefs': {
+        const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed());
+        return w ? { ...(w.webContents as any).getLastWebPreferences?.() } : {};
+      }
+      case 'searchWindowPrefs': {
+        if (!isSearchWindowVisible() && !isSearchWindowOpen()) toggleSearchWindow();
+        const w = BrowserWindow.getAllWindows().find((x) => x !== mainWindow && !x.isDestroyed());
+        return w ? { ...(w.webContents as any).getLastWebPreferences?.() } : {};
+      }
+      case 'searchWindowToggle':
+        toggleSearchWindow();
+        return { visible: isSearchWindowVisible() };
       default:
         throw new Error(`unknown qa op: ${op}`);
     }
