@@ -44,6 +44,14 @@
   "build": {
     "appId": "com.thinkflyflow.desktop",
     "productName": "ThinkFlyFlow",
+    "protocols": [
+      {
+        "name": "ThinkFlyFlow",
+        "schemes": [
+          "thinkflyflow"
+        ]
+      }
+    ],
     "directories": {
       "output": "release"
     },
